@@ -11,7 +11,7 @@ from datetime import datetime
 # Set up logger
 suffix = datetime.now().strftime('%Y%m%d%H%M%S')
 logging.basicConfig(
-    filename=f'section_parser-{suffix}.log',
+    filename=f'./logs/section_parser-{suffix}.log',
     filemode='a',  # append mode
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
@@ -21,8 +21,9 @@ logger = logging.getLogger(__name__)
 def parse_and_clean_section_results(files):
 
     # if files is 'All', get the list of all files
-    if files.lower() == 'ALL':
-        files = os.listdir("pdfs/section results/")
+    if type(files) == str:
+        if files.lower() == 'ALL':
+            files = os.listdir("pdfs/section results/")
         
     for file in files:
         try:
