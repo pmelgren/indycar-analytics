@@ -1,0 +1,22 @@
+Pos,Start,Car,Name,Team,Laps,Laps Led,Pit Stops,Elapsed,Avg Speed,Status,Points
+1,4,5,James Hinchcliffe,Arrow McLaren,85,25,2,01:50:28.9818,90.845,Running,51
+2,12,18,Sebastien Bourdais,Dale Coyne Racing,85,--,3,01:50:30.4758,90.824,Running,40
+3,8,2,Josef Newgarden,Team Penske,85,--,3,01:50:31.2978,90.813,Running,35
+4,2,9,Scott Dixon,Chip Ganassi Racing,85,32,3,01:50:31.7650,90.807,Running,35
+5,21,1,Simon Pagenaud,Team Penske,85,--,3,01:50:32.3752,90.798,Running,30
+6,13,19,Ed Jones,Dale Coyne Racing,85,--,3,01:50:34.7769,90.765,Running,28
+7,14,14,Carlos Munoz,A.J. Foyt Enterprises,85,--,3,01:50:35.9211,90.750,Running,26
+8,19,20,Spencer Pigot,Ed Carpenter Racing,85,--,3,01:50:38.0388,90.721,Running,24
+9,1,3,Helio Castroneves,Team Penske,85,--,4,01:50:38.3221,90.717,Running,23
+10,6,15,Graham Rahal,Rahal Letterman Lanigan Racing,85,--,3,01:50:46.8450,90.601,Running,20
+11,15,21,JR Hildebrand,Ed Carpenter Racing,84,--,3,01:49:33.0979,90.539,Contact,19
+12,16,7,Mikhail Aleshin,Arrow McLaren,84,--,3,01:49:35.0000,90.380,Running,18
+13,9,12,Will Power,Team Penske,84,--,5,01:50:48.0027,89.519,Running,17
+14,20,8,Max Chilton,Chip Ganassi Racing,84,--,4,01:50:48.4542,89.513,Running,16
+15,11,10,Tony Kanaan,Chip Ganassi Racing,84,--,6,01:50:49.0126,89.506,Running,15
+16,17,4,Conor Daly,A.J. Foyt Enterprises,84,--,5,01:50:49.7714,89.495,Running,14
+17,3,28,Ryan Hunter-Reay,Andretti Global,79,28,2,01:41:38.5661,91.776,Off Course,14
+18,18,26,Takuma Sato,Andretti Global,78,--,4,01:40:46.3691,91.396,Off Course,12
+19,5,98,Alexander Rossi,Andretti Herta w/ Marco & Curb-Agajanian,62,--,2,01:15:43.3798,96.681,Mechanical,11
+20,10,27,Marco Andretti,Andretti Global,14,--,1,00:20:31.8548,80.519,Off-Course,10
+21,7,83,Charlie Kimball,Chip Ganassi Racing,1,--,--,00:02:25.6236,48.651,Contact,9
