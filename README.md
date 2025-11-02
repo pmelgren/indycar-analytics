@@ -1,13 +1,17 @@
-# INDYCAR-analytics
-Data parsing and analytics functions for working with indycar data.
+# INDYCAR Analytics
+Data parsing and analytics for working with indycar data.
+
+This repo contians functions that help parse data from INDYCAR's session report pdfs into a usable format for analysis. The repo also contains notebooks with in-depth analysis on certain topics.
+
+PLEASE NOTE: This repo is a work in progress and is intended fo enterntainment/research purposes only. If you use these functions, please credit the original source and feel free to contribute any functions/insights you come up with. 
 
 ## Basic Usage
-Begin by downloading INDYCAR session reports here: https://indycar.com/results and save each file under the appropriated sub-directory in the /pdfs folder of this repo.
+Begin by downloading INDYCAR session reports here: https://indycar.com/results and save each file under the appropriate sub-directory in the /pdfs folder of this repo.
 
 To parse the data of a section times pdf you can run the following:
 ```
 from parsing._section_results_main import parse_and_clean_section_results
-parse_and_clean_section_results(['2017_Toyota_Grand_Prix_of_Long_Beach.pdf'])
+parse_and_clean_section_results(['2017_Toyota_Grand_Prix_of_Long_Beach.pdf'])`
 ```
 
 Then load the data for analysis:
@@ -27,8 +31,7 @@ df.loc[df.loc[df.Section == 'Lap','Time'].idxmin()]
 ```
 
 ## Further Analysis
-For more detailed and less trivial analysis, check out the notebooks folder:
- * Build Overtake Data.ipynb - notebook to determine when on-track overtakes occur and to detect trends in on-track overtakes.
- * Position Movement.ipynb - notebook to explore all position changes with the eventual goal of classifying all position changes and answering the question of how a driver went from one position to another.
-
+For more detailed analysis check out the notebooks folder:
+ * __Build Overtake Data.ipynb__ - notebook to determine when on-track overtakes occur and to detect trends in on-track overtakes.
+ * __Position Movement.ipynb__ - notebook to explore all position changes with the eventual goal of classifying all position changes and answering the question of how a driver went from one position to another.
 
