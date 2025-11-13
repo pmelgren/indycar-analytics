@@ -75,7 +75,7 @@ def parse_lap_chart_file(doc):
                                 'Fill':find_fill(s, fills)})
     
                     
-if __name__ == '_3_main__':
+if __name__ == '__main__':
     
     for file in os.listdir("pdfs/section results/"):
         jsonfile = file.replace('.pdf','.json')
