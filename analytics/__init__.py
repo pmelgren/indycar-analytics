@@ -1,5 +1,5 @@
 """Analytics utilities package."""
 
-from ._lap_timing import build_lap_timing
+from .race_data import RaceData
 
-__all__ = ["build_lap_timing"]
+__all__ = ["RaceData"]
