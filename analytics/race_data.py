@@ -6,6 +6,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
+import re
 
 import pandas as pd
 
@@ -49,21 +50,24 @@ class RaceData:
         Overtake feature table.
     """
 
-    race_id: str
+    race_ids: list
     base_dir: Path
-    section: pd.DataFrame
     results: pd.DataFrame
-    timing: pd.DataFrame
-    pit_stops: pd.DataFrame
-    flags: pd.DataFrame
+    section: pd.DataFrame | None
+    timing: pd.DataFrame | None
+    pit_stops: pd.DataFrame | None
+    flags: pd.DataFrame | None
 
     def __init__(
         self,
-        race_id: int | str,
+        race_id: Optional[int | str | list] = None,
+        year: Optional[int | str | list] = None,
         base_dir: Optional[str | Path] = None,
+        results_only: bool=False,
+        
     ) -> None:
-        race_id_str = str(race_id)
-
+        
+        # determine project root directory
         if base_dir is None:
             # analytics/ -> project root
             base_dir = Path(__file__).resolve().parents[1]
@@ -71,35 +75,79 @@ class RaceData:
             base_dir = Path(base_dir).resolve()
 
         self.base_dir = base_dir
-        self.race_id = race_id_str
 
-        section_path = self._find_parquet(
-            base_dir / "cleandata" / "section results",
-            prefix="sectionresults_",
-            race_id=race_id_str,
-        )
-        results_path = self._find_parquet(
-            base_dir / "cleandata" / "results",
-            prefix="results_",
-            race_id=race_id_str,
-        )
+        # determine list of ids to use base on input
+        if race_id is not None:
+            if type(race_id) == list:
+                race_id_lst = list(map(str,race_id))
+            else:
+                race_id_lst = [str(race_id)]
+        else:
+            race_id_lst = []
+            
+        if year is not None:
+            if type(year) == list:
+                year_lst = list(map(str,year))
+            else:
+                year_lst = [str(year)]
+        else:
+            year_lst = []
+                
+        all_ids = race_id_lst
+        for year in year_lst:
+            if not results_only:
+                srids = self._find_race_ids_from_year(
+                    base_dir / "cleandata" / "section results",
+                    prefix="sectionresults_",
+                    year=year
+                )
+                all_ids+=srids
+            resids = self._find_race_ids_from_year(
+                base_dir / "cleandata" / "results",
+                prefix="results_",
+                year=year
+            )
+            all_ids+=resids
 
-        self.section = pd.read_parquet(section_path)
-        self.results = pd.read_parquet(results_path)
-
-        # Tag raw data with race id
-        self.section["RaceID"] = race_id_str
-        self.results["RaceID"] = race_id_str
-
-        # Build derived tables using existing analytics utilities
-        self.timing = self._build_lap_timing()
-        self.pit_stops = self._build_pit_stops()
-        self.flags = self._build_flags_data()
-
-        # Tag derived tables with race id
-        self.timing["RaceID"] = race_id_str
-        self.pit_stops["RaceID"] = race_id_str
-        self.flags["RaceID"] = race_id_str
+        self.race_ids = sorted(list(set(all_ids)))
+        
+        section_dfs=[]
+        results_dfs=[]
+        for race_id_str in self.race_ids:
+            
+            if not results_only:
+                section_path = self._find_parquet(
+                    base_dir / "cleandata" / "section results",
+                    prefix="sectionresults_",
+                    race_id=race_id_str,
+                )
+                sdf = pd.read_parquet(section_path)
+                sdf['RaceID'] = race_id_str
+                section_dfs.append(sdf)
+            
+            results_path = self._find_parquet(
+                base_dir / "cleandata" / "results",
+                prefix="results_",
+                race_id=race_id_str,
+            )
+            rdf = pd.read_parquet(results_path)
+            rdf['RaceID'] = race_id_str
+            results_dfs.append(rdf)
+            
+        self.results = pd.concat(results_dfs)
+        
+        if not results_only:
+            self.section = pd.concat(section_dfs)
+    
+            # Build derived tables using existing analytics utilities
+            self.timing = self._build_lap_timing()
+            self.pit_stops = self._build_pit_stops()
+            self.flags = self._build_flags_data()
+        else:
+            self.section=None
+            self.timing=None
+            self.pit_stops=None
+            self.flags=None
  
     def _parse_elapsed_time(self, value):
         parts = str(value).split(":")
@@ -113,32 +161,36 @@ class RaceData:
 
         section["Car"] = section["Car"].astype(str)
         results["Car"] = results["Car"].astype(str)
+        results["Laps"] = results["Lap"].astype(int)
 
-        merged = section.merge(results[["Car", "Laps"]], on="Car", how="inner")
+        merged = section.merge(results[["Car", "Laps", "RaceID"]], on=["Car","RaceID"], how="inner")
         merged = merged.loc[merged["Lap"] <= merged["Laps"]].copy()
 
         lap_sections = merged.loc[
             merged["Section"] == "Lap",
-            ["Car", "Driver", "Lap", "Flag", "Time"],
+            ["RaceID", "Car", "Driver", "Lap", "Flag", "Time"],
         ]
 
         lap_sections = lap_sections.rename(columns={"Time": "LapTime"})
 
         totals = (
             lap_sections
-            .groupby(["Car", "Driver"], as_index=False)["LapTime"]
-            .agg(sum="sum", count="count")
+            .groupby(["Car", "Driver", "RaceID"], as_index=False)
+            ["LapTime"].agg(sum="sum", count="count")
         )
 
         results["ElapsedSeconds"] = results["Elapsed Time"].apply(
             self._parse_elapsed_time
         )
 
-        leader_gaps = results.merge(totals, on="Car", how="inner")
+        leader_gaps = (
+            results[["RaceID", 'Car','ElapsedSeconds','Driver']]
+            .merge(totals[['Car','sum', "RaceID"]], on=["Car","RaceID"], how="inner")
+        )
 
         leader_gaps["Gap"] = leader_gaps["ElapsedSeconds"] - leader_gaps["sum"]
 
-        lap_zero = leader_gaps[["Car", "Driver", "Gap"]].rename(
+        lap_zero = leader_gaps[["RaceID", "Car", "Driver", "Gap"]].rename(
             columns={"Gap": "LapTime"}
         )
         lap_zero["Lap"] = 0
@@ -150,14 +202,15 @@ class RaceData:
             .reset_index(drop=True)
         )
 
-        times["RaceTime"] = times.groupby("Car")["LapTime"].cumsum()
-        times = times.sort_values("RaceTime").reset_index(drop=True)
-        times["Gap"] = times["RaceTime"].diff()
+        times["RaceTime"] = times.groupby(["Car","RaceID"])["LapTime"].cumsum()
+        times = times.sort_values(["RaceID","RaceTime"]).reset_index(drop=True)
+        times["Gap"] = times.groupby("RaceID")["RaceTime"].diff()
 
         times.rename(columns={"Lap": "LapCompleted"}, inplace=True)
         times["LapStarted"] = times["LapCompleted"] + 1
 
         ordered_columns = [
+            "RaceID",
             "Car",
             "Driver",
             "LapStarted",
@@ -178,7 +231,10 @@ class RaceData:
         times["Car"] = times["Car"].astype(str)
 
         inlaps = (
-            section.loc[section["Section"] == "SF to PI", ["Car", "Lap"]]
+            section.loc[
+                section["Section"] == "SF to PI",
+                ["RaceID", "Car", "Lap"],
+            ]
             .rename(columns={"Lap": "LapStarted"})
             .copy()
         )
@@ -187,7 +243,7 @@ class RaceData:
         outlaps = (
             section.loc[
                 (section["Lap"] > 1) & (section["Section"] == "PO to SF"),
-                ["Car", "Lap"],
+                ["RaceID", "Car", "Lap"],
             ]
             .rename(columns={"Lap": "LapStarted"})
             .copy()
@@ -195,14 +251,14 @@ class RaceData:
         outlaps["OutLap"] = 1
 
         ps = (
-            times
-            .merge(inlaps, on=["Car", "LapStarted"], how="left")
-            .merge(outlaps, on=["Car", "LapStarted"], how="left")
+            times[['RaceID','Car','LapStarted']]
+            .merge(inlaps, on=["RaceID", "Car", "LapStarted"], how="left")
+            .merge(outlaps, on=["RaceID", "Car", "LapStarted"], how="left")
         )
 
         ps["LastPitLap"] = ps.loc[ps["OutLap"] == 1, "LapStarted"]
         ps.loc[ps["LapStarted"] == 1, "LastPitLap"] = 1
-        ps["LastPitLap"] = ps.groupby("Car")["LastPitLap"].ffill()
+        ps["LastPitLap"] = ps.groupby(["RaceID", "Car"])["LastPitLap"].ffill()
 
         ps["LapsSincePit"] = (ps["LapStarted"] - ps["LastPitLap"]).astype(int)
 
@@ -217,7 +273,7 @@ class RaceData:
 
         flags = (
             df
-            .groupby(["Car", "Lap"])["Flag"]
+            .groupby(["RaceID", "Car", "Lap"])["Flag"]
             .apply(list)
             .rename("SectionFlags")
             .reset_index()
@@ -279,3 +335,16 @@ class RaceData:
             )
 
         return directory / candidates[0]
+    
+    @staticmethod
+    def _find_race_ids_from_year(directory: Path, prefix: str, year: str) -> list:
+        if not directory.exists():
+            raise FileNotFoundError(f"Directory not found: {directory}")
+
+        token = f"{year}-"
+        return [
+            re.findall(r'.+_([0-9]{4})_.+',f)[0]
+            for f in os.listdir(directory)
+            if f.startswith(prefix) and token in f and f.endswith(".pq")
+        ]
+        
