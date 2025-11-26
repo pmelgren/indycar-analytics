@@ -50,9 +50,9 @@ class RaceData:
         Overtake feature table.
     """
 
-    race_ids: list
     base_dir: Path
-    results: pd.DataFrame
+    races: pd.DataFrame
+    results_df: pd.DataFrame | None
     section: pd.DataFrame | None
     timing: pd.DataFrame | None
     pit_stops: pd.DataFrame | None
@@ -75,79 +75,49 @@ class RaceData:
             base_dir = Path(base_dir).resolve()
 
         self.base_dir = base_dir
+        
+        res_dfs = self._get_race_table_from_dir(
+            directory=self.base_dir / "cleandata" / "results",
+            prefix="results_"
+        )
+        sr_dfs = self._get_race_table_from_dir(
+            directory=self.base_dir / "cleandata" / "section results",
+            prefix="sectionresults_"            
+        )
+        
+        self.race_options = res_dfs.merge(sr_dfs,
+                                on=['Date','RaceID','Name'],
+                                how='outer'
+                           )
+        self.races = pd.DataFrame({},
+                                  columns = self.race_options.columns
+                                  )
+        
+    def add_races_by_id(self,race_ids,section_results=True):
 
         # determine list of ids to use base on input
-        if race_id is not None:
-            if type(race_id) == list:
-                race_id_lst = list(map(str,race_id))
-            else:
-                race_id_lst = [str(race_id)]
+        if type(race_ids) == list:
+            race_id_lst = list(map(str,race_ids))
         else:
-            race_id_lst = []
+            race_id_lst = [str(race_ids)]
             
-        if year is not None:
-            if type(year) == list:
-                year_lst = list(map(str,year))
-            else:
-                year_lst = [str(year)]
-        else:
-            year_lst = []
-                
-        all_ids = race_id_lst
-        for year in year_lst:
-            if not results_only:
-                srids = self._find_race_ids_from_year(
-                    base_dir / "cleandata" / "section results",
-                    prefix="sectionresults_",
-                    year=year
-                )
-                all_ids+=srids
-            resids = self._find_race_ids_from_year(
-                base_dir / "cleandata" / "results",
-                prefix="results_",
-                year=year
-            )
-            all_ids+=resids
+        new_races = self.race_options.copy()
+        new_races = new_races.loc[new_races.RaceID.isin(race_id_lst) &
+                                  ~new_races.RaceID.isin(self.races.RaceID)
+                                 ]
 
-        self.race_ids = sorted(list(set(all_ids)))
-        
-        section_dfs=[]
-        results_dfs=[]
-        for race_id_str in self.race_ids:
-            
-            if not results_only:
-                section_path = self._find_parquet(
-                    base_dir / "cleandata" / "section results",
-                    prefix="sectionresults_",
-                    race_id=race_id_str,
-                )
-                sdf = pd.read_parquet(section_path)
-                sdf['RaceID'] = race_id_str
-                section_dfs.append(sdf)
-            
-            results_path = self._find_parquet(
-                base_dir / "cleandata" / "results",
-                prefix="results_",
-                race_id=race_id_str,
-            )
-            rdf = pd.read_parquet(results_path)
-            rdf['RaceID'] = race_id_str
-            results_dfs.append(rdf)
-            
-        self.results = pd.concat(results_dfs)
-        
-        if not results_only:
-            self.section = pd.concat(section_dfs)
-    
-            # Build derived tables using existing analytics utilities
-            self.timing = self._build_lap_timing()
-            self.pit_stops = self._build_pit_stops()
-            self.flags = self._build_flags_data()
-        else:
-            self.section=None
-            self.timing=None
-            self.pit_stops=None
-            self.flags=None
+        self.races = pd.concat([self.races,new_races],ignore_index=True)
+
+        if section_results:
+            new_sr_dfs = []
+            for f in new_races.sectionresults_File.dropna():
+                df = pd.read_parquet(base_dir / "cleandata" / "section results" / f)
+                new_sr_dfs.append(df)
+
+        new_res_dfs = []
+        for f in new_races.results_File.dropna():
+            df = pd.read_parquet(base_dir / "cleandata" / "results" / f)
+            new_res_dfs.append(df)
  
     def _parse_elapsed_time(self, value):
         parts = str(value).split(":")
@@ -296,10 +266,6 @@ class RaceData:
 
         return flags
 
-    def _build_overtake_features(self) -> pd.DataFrame:
-        # Placeholder until overtake feature logic is implemented
-        return pd.DataFrame()
-
     @staticmethod
     def _find_parquet(directory: Path, prefix: str, race_id: str) -> Path:
         """
@@ -347,4 +313,23 @@ class RaceData:
             for f in os.listdir(directory)
             if f.startswith(prefix) and token in f and f.endswith(".pq")
         ]
+    
+    @staticmethod
+    def _get_race_table_from_dir(directory: Path, prefix: str) -> pd.DataFrame:
+        re_str = prefix+r'(\d{4}-\d{2}-\d{2})_(\d{4})_(.+)\.pq'
+        
+        candidates = [
+            (re.findall(re_str,f)[0],f)
+            for f in os.listdir(directory)
+            if f.startswith(prefix) and f.endswith(".pq")
+        ]
+        
+        return pd.DataFrame([
+            {'Date':m[0], 'RaceID':m[1], 'Name': m[2], f'{prefix}File':f}
+            for m,f in candidates
+            if len(m) == 3
+        ])
+        
+        
+        
         
