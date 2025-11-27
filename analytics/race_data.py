@@ -51,19 +51,17 @@ class RaceData:
     """
 
     base_dir: Path
+    race_options: pd.DataFrame
     races: pd.DataFrame
-    results_df: pd.DataFrame | None
-    section: pd.DataFrame | None
-    timing: pd.DataFrame | None
-    pit_stops: pd.DataFrame | None
-    flags: pd.DataFrame | None
+    results_df: Optional[pd.DataFrame]
+    section_results_df: Optional[pd.DataFrame]
+    timing_df: Optional[pd.DataFrame]
+    pit_stops: Optional[pd.DataFrame]
+    flags: Optional[pd.DataFrame]
 
     def __init__(
         self,
-        race_id: Optional[int | str | list] = None,
-        year: Optional[int | str | list] = None,
         base_dir: Optional[str | Path] = None,
-        results_only: bool=False,
         
     ) -> None:
         
@@ -111,23 +109,78 @@ class RaceData:
         if section_results:
             new_sr_dfs = []
             for f in new_races.sectionresults_File.dropna():
-                df = pd.read_parquet(base_dir / "cleandata" / "section results" / f)
+                df = pd.read_parquet(self.base_dir / "cleandata" / "section results" / f)
                 new_sr_dfs.append(df)
+
+            if not hasattr(self, 'section_results_df'):
+                self.section_results_df = pd.concat(new_sr_dfs,ignore_index=True)
+            else:
+                self.section_results_df = pd.concat([self.section_results_df]+new_sr_dfs,
+                                                    ignore_index=True)
 
         new_res_dfs = []
         for f in new_races.results_File.dropna():
-            df = pd.read_parquet(base_dir / "cleandata" / "results" / f)
+            df = pd.read_parquet(self.base_dir / "cleandata" / "results" / f)
             new_res_dfs.append(df)
- 
+
+        if not hasattr(self, 'results_df'):
+            self.results_df = pd.concat(new_res_dfs,ignore_index=True)
+        else:
+            self.results_df = pd.concat([self.results_df]+new_res_dfs,
+                                        ignore_index=True) 
+
+    def add_races_by_date(self,start_date,end_date,section_results=True):
+
+        startdt = pd.to_datetime(start_date)
+        enddt = pd.to_datetime(end_date)
+            
+        new_races = self.race_options.copy()
+        new_races['RaceDate'] = pd.to_datetime(new_races.Date)
+        new_races = new_races.loc[(new_races.RaceDate >= startdt) &
+                                  (new_races.RaceDate <= enddt) & 
+                                  ~new_races.RaceID.isin(self.races.RaceID)
+                                 ]
+        
+        new_races.drop(columns=['RaceDate'],inplace=True)
+        self.races = pd.concat([self.races,new_races],ignore_index=True)
+
+        if section_results:
+            new_sr_dfs = []
+            for i in new_races.loc[~new_races.sectionresults_File.isna()].index:
+                f = new_races.loc[i,'sectionresults_File']
+                df = pd.read_parquet(self.base_dir / "cleandata" / "section results" / f)
+                df['RaceID'] = new_races.loc[i,'RaceID']
+                new_sr_dfs.append(df)
+
+            if not hasattr(self, 'section_results_df'):
+                self.section_results_df = pd.concat(new_sr_dfs,ignore_index=True)
+            else:
+                self.section_results_df = pd.concat([self.section_results_df]+new_sr_dfs,
+                                                    ignore_index=True)
+
+        new_res_dfs = []
+        for i in new_races.loc[~new_races.results_File.isna()].index:
+            f = new_races.loc[i,'results_File']            
+            df = pd.read_parquet(self.base_dir / "cleandata" / "results" / f)
+            df['RaceID'] = new_races.loc[i,'RaceID']
+            new_res_dfs.append(df)
+
+        if not hasattr(self, 'results_df'):
+            self.results_df = pd.concat(new_res_dfs,ignore_index=True)
+        else:
+            self.results_df = pd.concat([self.results_df]+new_res_dfs,
+                                        ignore_index=True)     
+
+
     def _parse_elapsed_time(self, value):
         parts = str(value).split(":")
         hours, minutes, seconds = parts
 
         return int(hours) * 3600 + int(minutes) * 60 + float(seconds)
 
-    def _build_lap_timing(self) -> pd.DataFrame:
-        section = self.section.copy()
-        results = self.results.copy()
+    def _build_lap_timing_df(self):
+        section = self.section_results_df.copy()
+        results = self.results_df.copy()
 
         section["Car"] = section["Car"].astype(str)
         results["Car"] = results["Car"].astype(str)
@@ -191,7 +244,7 @@ class RaceData:
             "Flag",
         ]
 
-        return times[ordered_columns]
+        self.timing_df = times[ordered_columns]
 
     def _build_pit_stops(self) -> pd.DataFrame:
         section = self.section.copy()
@@ -265,42 +318,6 @@ class RaceData:
         flags["Flag"] = flags["SectionFlags"].apply(_aggregate_flags)
 
         return flags
-
-    @staticmethod
-    def _find_parquet(directory: Path, prefix: str, race_id: str) -> Path:
-        """
-        Locate a parquet file matching the given race_id.
-
-        The expected naming pattern is:
-
-            {prefix}YYYY-MM-DD_{race_id}_<description>.pq
-
-        e.g.
-            sectionresults_2017-04-09_3678_Toyota Grand Prix....pq
-            results_2017-04-09_3678_Toyota Grand Prix....pq
-        """
-        if not directory.exists():
-            raise FileNotFoundError(f"Directory not found: {directory}")
-
-        token = f"_{race_id}_"
-        candidates = [
-            f
-            for f in os.listdir(directory)
-            if f.startswith(prefix) and token in f and f.endswith(".pq")
-        ]
-
-        if not candidates:
-            raise FileNotFoundError(
-                f"No parquet file found in {directory} for race_id={race_id} "
-                f"and prefix={prefix!r}"
-            )
-        if len(candidates) > 1:
-            raise RuntimeError(
-                f"Multiple parquet files found in {directory} for "
-                f"race_id={race_id}: {candidates}"
-            )
-
-        return directory / candidates[0]
     
     @staticmethod
     def _find_race_ids_from_year(directory: Path, prefix: str, year: str) -> list:
