@@ -169,10 +169,18 @@ def clean_results_pdf(file):
     hdr = (df == 'Pos').any(axis=1).idxmax()
     firstcol = (df == 'Pos').any(axis=0).idxmax()
     
+    headernames = df.loc[hdr]
+    
     # handle when word-wrapped header cols end up in 2 different rows
     if 'Down' in list(df.loc[hdr]):
         if ('Laps' in list(df.loc[hdr-1])) | ('Time' in list(df.loc[hdr-1])):
             headernames = df.apply(lambda x: ' '.join([x[hdr-1],x[hdr]]).strip(),axis=0)
+            
+    if 'Car Driver' in headernames.values:
+        cdidx = headernames[headernames == 'Car Driver'].idxmax()
+        if headernames[cdidx+1] == '':
+            headernames[cdidx] = 'Car'
+            headernames[cdidx] = 'Driver'
             
     # find the last row
     if df.iloc[hdr+1,firstcol] != '1':

@@ -19,6 +19,7 @@ def parse_and_clean_results(files):
     if type(files) == str:
         if files.upper() == 'ALL':
             files = os.listdir("pdfs/results/")
+            logger.debug(f'Parsing {len(files)} files in total.')
         else:
             files = [files]
             
@@ -33,7 +34,8 @@ def parse_and_clean_results(files):
                 logger.info(f'Parsing and cleaning {file}')
                 
                 dfclean = clean_results_pdf(os.path.join('pdfs','results',file))
-                dfclean.drop(columns = [''], inplace=True)
+                if '' in dfclean.columns:
+                    dfclean.drop(columns = [''], inplace=True)
                 dfclean.to_parquet(parquet_path)
                 
                 logger.info(f'Successfully parsed and cleaned {file}')
