@@ -189,8 +189,11 @@ def clean_results_pdf(file):
     nextpos = 1
     for i in range(hdr+1,len(df.index)):
         if df.iloc[i,firstcol] != str(nextpos):
-            lastrow = i
-            break
+            if (df.iloc[i,firstcol] == '') & (df.iloc[i+1,firstcol] == str(nextpos)):
+                continue
+            else:
+                lastrow = i
+                break
         else:
             nextpos+=1
     else:
@@ -198,5 +201,6 @@ def clean_results_pdf(file):
             
     dfret = df.iloc[hdr+1:lastrow+1,firstcol:]
     dfret.columns = headernames
+    dfret = dfret.loc[dfret.Pos != ''].copy()
     
     return dfret    
