@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import re
+import camelot
 
 def get_lap_chart_fill_mapping():
     {'Pit':(65, 105, 224) ,
@@ -156,3 +157,50 @@ def clean_section_results_page(dfp, st):
                )
     dffinal.columns = [l1 if l1 != '' else l0 for l0, l1 in dffinal.columns]
     return dffinal
+        
+def clean_results_pdf(file):
+    tables = camelot.read_pdf(file, pages="1", flavor="stream")  
+    for t in tables:
+        if (t.df == 'Pos').max().max():
+            df = t.df
+            break
+    
+    # identify header and first column based on 'Pos' (always first col header)
+    hdr = (df == 'Pos').any(axis=1).idxmax()
+    firstcol = (df == 'Pos').any(axis=0).idxmax()
+    
+    headernames = df.loc[hdr]
+    
+    # handle when word-wrapped header cols end up in 2 different rows
+    if 'Down' in list(df.loc[hdr]):
+        if ('Laps' in list(df.loc[hdr-1])) | ('Time' in list(df.loc[hdr-1])):
+            headernames = df.apply(lambda x: ' '.join([x[hdr-1],x[hdr]]).strip(),axis=0)
+            
+    if 'Car Driver' in headernames.values:
+        cdidx = headernames[headernames == 'Car Driver'].idxmax()
+        if headernames[cdidx+1] == '':
+            headernames[cdidx] = 'Car'
+            headernames[cdidx] = 'Driver'
+            
+    # find the last row
+    if df.iloc[hdr+1,firstcol] != '1':
+        raise Exception("Error somewhere in parsing file {file}. You're on your own bro.")
+        
+    nextpos = 1
+    for i in range(hdr+1,len(df.index)):
+        if df.iloc[i,firstcol] != str(nextpos):
+            if (df.iloc[i,firstcol] == '') & (df.iloc[i+1,firstcol] == str(nextpos)):
+                continue
+            else:
+                lastrow = i
+                break
+        else:
+            nextpos+=1
+    else:
+        lastrow = df.index.max()
+            
+    dfret = df.iloc[hdr+1:lastrow+1,firstcol:]
+    dfret.columns = headernames
+    dfret = dfret.loc[dfret.Pos != ''].copy()
+    
+    return dfret    

@@ -3,7 +3,7 @@ import json
 import os
 import pandas as pd
 import logging
-from ._parse_section_times import parse_section_results_file
+from ._util import parse_file
 from ._cleaning import clean_section_results_page, parse_sections_table
 import time
 from datetime import datetime
@@ -36,7 +36,7 @@ def parse_and_clean_section_results(files):
                 start = time.perf_counter()
                 logger.info(f'Parsing {file}')
                 doc = fitz.open(os.path.join('pdfs', 'section results', file))
-                allrows = parse_section_results_file(doc)
+                allrows = parse_file(doc)
         
                 with open(json_path, "w") as f:
                     json.dump(allrows, f)
