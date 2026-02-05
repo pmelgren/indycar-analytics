@@ -158,7 +158,7 @@ def clean_section_results_page(dfp, st):
     dffinal.columns = [l1 if l1 != '' else l0 for l0, l1 in dffinal.columns]
     return dffinal
         
-def clean_results_pdf(file):
+def parse_results_pdf(file):
     tables = camelot.read_pdf(file, pages="1", flavor="stream")  
     for t in tables:
         if (t.df == 'Pos').max().max():
@@ -169,23 +169,11 @@ def clean_results_pdf(file):
     hdr = (df == 'Pos').any(axis=1).idxmax()
     firstcol = (df == 'Pos').any(axis=0).idxmax()
     
-    headernames = df.loc[hdr]
-    
-    # handle when word-wrapped header cols end up in 2 different rows
-    if 'Down' in list(df.loc[hdr]):
-        if ('Laps' in list(df.loc[hdr-1])) | ('Time' in list(df.loc[hdr-1])):
-            headernames = df.apply(lambda x: ' '.join([x[hdr-1],x[hdr]]).strip(),axis=0)
-            
-    if 'Car Driver' in headernames.values:
-        cdidx = headernames[headernames == 'Car Driver'].idxmax()
-        if headernames[cdidx+1] == '':
-            headernames[cdidx] = 'Car'
-            headernames[cdidx] = 'Driver'
-            
-    # find the last row
+    # verify that the first row is Pos 1
     if df.iloc[hdr+1,firstcol] != '1':
         raise Exception("Error somewhere in parsing file {file}. You're on your own bro.")
-        
+
+    # find the last row        
     nextpos = 1
     for i in range(hdr+1,len(df.index)):
         if df.iloc[i,firstcol] != str(nextpos):
@@ -198,9 +186,80 @@ def clean_results_pdf(file):
             nextpos+=1
     else:
         lastrow = df.index.max()
-            
+        
+    ###### Find and Fix header names #####
+    headernames = df.loc[hdr]
+    
+    # handle when word-wrapped header cols end up in 2 different rows
+    if 'Down' in list(df.loc[hdr]):
+        if ('Laps' in list(df.loc[hdr-1])) | ('Time' in list(df.loc[hdr-1])):
+            headernames = df.apply(lambda x: ' '.join([x[hdr-1],x[hdr]]).strip(),axis=0)
+    
+    # prepare output df
     dfret = df.iloc[hdr+1:lastrow+1,firstcol:]
     dfret.columns = headernames
     dfret = dfret.loc[dfret.Pos != ''].copy()
     
-    return dfret    
+    return dfret
+    
+def clean_results_df(df):
+    
+    df[df ==''] = np.nan
+    df.dropna(axis=1, how='all', inplace=True)
+    
+    # car and driver header name can get combined
+    if 'Car Driver' in df.columns:
+        colnames = list(df.columns)
+        i = colnames.index('Car Driver')
+    
+        if colnames[i + 1] == '':
+            colnames[i] = 'Car'
+            colnames[i + 1] = 'Driver'
+            df.columns = colnames
+            
+    # fix Camelot bleed between Car / Driver cols
+    fix = df['Car'].astype(str).str.extract(r'^(?P<Car>\d+)\s+(?P<Driver>.+)$')
+    df['Driver'] = df['Driver'].combine_first(fix['Driver'])
+    df['Car'] = fix.Car.combine_first(df.Car)
+    
+    # standardize CAET column
+    if 'C/E/T' in df.columns:
+        df.rename(columns = {'C/E/T':'C/A/E/T'}, inplace=True)
+
+    # fix camelot bleed between driver and c/E/T columns 
+    caet_fix = df['Driver'].str.extract(r'^(?P<Driver>.+?)\s+(?P<CET>D/[^ ]+)$')
+    df['Driver'] = caet_fix['Driver'].combine_first(df['Driver'])
+    df['C/A/E/T'] = df['C/A/E/T'].combine_first(caet_fix['CET'])
+    
+    df['C/A/E/T'] = df['C/A/E/T'].apply(lambda x: x[:2]+'-/'+x[-3:] if len(x) == 5 else x)
+            
+    # fix issues with Running / Reason Out column
+    df.rename(columns={'Running/Reason Out':'Running / Reason Out'}, inplace=True)
+    
+    # fix when Avg Speed and Running/Reason Out get combined
+    pattern = r'^(\d+(?:\.\d+)?)\s+(.+)$'
+    matches_rro = df['Running / Reason Out'].str.extract(pattern)
+    matches_as = df['Avg Speed'].str.extract(pattern)
+    matches = matches_rro.combine_first(matches_as)
+    
+    df.loc[matches[0].notna(), 'Avg Speed'] = matches[0].astype(float)
+    df.loc[matches[1].notna(), 'Running / Reason Out'] = matches[1]
+    
+    # standardize values
+    df.loc[df['Running / Reason Out'].isin(['Off course','Off-Course']),'Running / Reason Out'] = 'Off Course'
+    df.loc[df['Running / Reason Out'] == 'DSQ','Running / Reason Out'] = 'DQ'
+        
+    # clean up numeric dtypes
+    for col in ['Pos','SP','Car','Lap','Laps Down','Pit Stops','Pts']:
+        df[col] = df[col].astype(int)
+    
+    df['Avg Speed'] = df['Avg Speed'].astype(float)
+    
+    if 'Total Pts' in df.columns:
+        df['Total Pts'] = df['Total Pts'].astype(int)
+        df['Standings'] = df['Standings'].astype(int)
+    
+    # drop any column which is all blank
+    df = df.drop(columns = df.columns[(df == '').all(axis=0)])
+    
+    return df    
