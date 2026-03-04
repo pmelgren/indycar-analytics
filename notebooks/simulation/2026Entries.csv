@@ -1,0 +1,30 @@
+Driver,DRIVER,Team,Rounds,RIC,RWT,Rookie,Engine
+"Collet, Caio",X,AJF,All,0,0,1,C
+"Ferrucci, Santino","FERRUCCI, SANTINO",AJF,All,94,51,0,C
+"Lundgaard, Christian","LUNDGAARD, CHRISTIAN",AMC,All,69,17,0,C
+"O'Ward, Pato","O'WARD, PATO",AMC,All,98,98,0,C
+"Siegel, Nolan","SIEGEL, NOLAN",AMC,All,29,27,0,C
+"Ericsson, Marcus","ERICSSON, MARCUS",AND,All,114,34,0,H
+"Kirkwood, Kyle","KIRKWOOD, KYLE",AND,All,68,51,0,H
+"Power, Will","POWER, WILL",AND,All,319,0,0,H
+"Dixon, Scott","DIXON, SCOTT",CGR,All,419,181,0,H
+"Palou, Alex","PALOU, ALEX",CGR,All,98,84,0,H
+"Simpson, Kyffin","SIMPSON, KYFFIN",CGR,All,34,34,0,H
+"Grosjean, Romain","GROSJEAN, ROMAIN",DCR,All,64,13,0,H
+"Hauger, Denis",X,DCR,All,0,0,1,H
+"Rasmussen, Christian","RASMUSSEN, CHRISTIAN",ECR,All,31,31,0,C
+"Rossi, Alexander","ROSSI, ALEXANDER",ECR,All,164,17,0,C
+"Robb, Sting Ray","ROBB, STING RAY",JHR,All,51,17,0,C
+"Veekay, Rinus","VEEKAY, RINUS",JHR,All,97,0,0,C
+"Armstrong, Marcus","ARMSTRONG, MARCUS",MSR,All,46,46,0,H
+"Rosenqvist, Felix","ROSENQVIST, FELIX",MSR,All,113,34,0,H
+"Malukas, David","MALUKAS, DAVID",PEN,All,61,0,0,C
+"McLaughlin, Scott","MCLAUGHLIN, SCOTT",PEN,All,85,85,0,C
+"Newgarden, Josef","NEWGARDEN, JOSEF",PEN,All,231,149,0,C
+"Foster, Louis",X,RLL,All,17,17,0,H
+"Rahal, Graham","RAHAL, GRAHAM",RLL,All,309,180,0,H
+"Schumacher, Mick",X,RLL,All,0,0,1,H
+"Harvey, Jack","HARVEY, JACK",DRR,Indy500,94,1,0,C
+"Castroneves, Helio","CASTRONEVES, HELIO",MSR,Indy500,222,66,0,H
+"Hunter-Reay, Ryan","HUNTER-REAY, RYAN",AMC,Indy500,295,0,0,C
+"Carpenter, Ed","CARPENTER, ED",ECR,Indy500,206,53,0,C
