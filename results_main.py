@@ -13,7 +13,7 @@ def parse_and_clean_results(files):
     for file in files:
         
         # skip exhibition race
-        if file == 'results_2024-03-24_6345_$1 Million Challenge.pdf':
+        if '$1 Million Challenge.pdf' in file:
             continue
         
         if file.split('.')[-1] != 'pdf':
@@ -29,3 +29,6 @@ def parse_and_clean_results(files):
             df = parse_results_pdf(os.path.join('pdfs','results',file))
             dfclean = clean_results_df(df)
             dfclean.to_parquet(parquet_path)
+
+if __name__ == '__main__':
+    parse_and_clean_results('all')
