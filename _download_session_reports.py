@@ -9,7 +9,12 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.firefox.options import Options
-from selenium.common.exceptions import TimeoutException, NoSuchDriverException
+from selenium.common.exceptions import (
+    TimeoutException,
+    NoSuchDriverException,
+    ElementClickInterceptedException,
+    StaleElementReferenceException,
+)
 
 options = Options()
 options.headless = False
@@ -19,8 +24,92 @@ def wait_for_overlay_to_clear(driver, timeout=10):
         EC.invisibility_of_element_located((By.CLASS_NAME, "loading-overlay"))
     )
 
+
+def click_with_retry(driver, locator, timeout=10, attempts=3):
+    last_error = None
+    for _ in range(attempts):
+        try:
+            wait_for_overlay_to_clear(driver, timeout)
+            elem = WebDriverWait(driver, timeout).until(EC.presence_of_element_located(locator))
+            driver.execute_script("arguments[0].scrollIntoView({block: 'center', inline: 'nearest'});", elem)
+            WebDriverWait(driver, timeout).until(EC.element_to_be_clickable(locator))
+            try:
+                elem.click()
+            except ElementClickInterceptedException:
+                wait_for_overlay_to_clear(driver, timeout)
+                driver.execute_script("arguments[0].click();", elem)
+            wait_for_overlay_to_clear(driver, timeout)
+            return
+        except (TimeoutException, ElementClickInterceptedException, StaleElementReferenceException) as e:
+            last_error = e
+            time.sleep(0.5)
+    if last_error:
+        raise last_error
+
+
+def process_current_race(driver, wait, race_name):
+    wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.race-tabs button.tab")))
+    wait_for_overlay_to_clear(driver)
+    time.sleep(2)
+
+    session_tabs = driver.find_elements(By.CSS_SELECTOR, "div.race-tabs button.tab")
+    session_names = [tab.text.strip() for tab in session_tabs]
+
+    for i, session_name in enumerate(session_names):
+        try:
+            print(f"  Session: {session_name}")
+            session_tab_locator = (By.CSS_SELECTOR, f"div.race-tabs button.tab:nth-of-type({i + 1})")
+            session_tab = wait.until(EC.presence_of_element_located(session_tab_locator))
+            if "active" not in session_tab.get_attribute("class"):
+                click_with_retry(driver, session_tab_locator)
+            else:
+                wait_for_overlay_to_clear(driver)
+            time.sleep(2)
+
+            date_elem = driver.find_element(By.CSS_SELECTOR, "p.tabs-details-descriptor")
+            session_date_text = date_elem.text.strip()
+            session_date = datetime.strptime(session_date_text, "%A, %B %d, %Y").strftime("%Y%m%d")
+
+            reports_section = driver.find_element(By.ID, "reports-content")
+            pdf_links = reports_section.find_elements(By.CSS_SELECTOR, "a[href$='.pdf']")
+
+            for link in pdf_links:
+                try:
+                    pdf_url = link.get_attribute("href")
+                    report_name = link.get_attribute("id").replace('-btn','').replace('-','')
+                    if not pdf_url:
+                        continue
+
+                    url_parts = pdf_url.split('/')
+                    race_id = url_parts[-3]
+
+                    safe_race_name = race_name.replace("'", "").replace(" ", "_")
+                    safe_session_name = session_name.replace("'", "").replace(" ", "_")
+                    filename = f"{session_date}_{race_id}_{safe_race_name}_{safe_session_name}_{report_name}.pdf"
+                    filepath = os.path.join("./pdfs", report_name, filename)
+
+                    if os.path.exists(filepath):
+                        print(f"    Skipping {report_name} (already exists)")
+                        continue
+
+                    print(f"    Downloading {report_name}")
+                    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+                    r = requests.get(pdf_url)
+                    if r.status_code == 404:
+                        print(f"    404 error for {report_name}, skipping")
+                        continue
+                    r.raise_for_status()
+                    with open(filepath, "wb") as f:
+                        f.write(r.content)
+                except Exception as e:
+                    print(f"    Error processing report {report_name if 'report_name' in locals() else '(unknown)'}: {e}")
+                    continue
+        except Exception as e:
+            print(f"  Error processing session {session_name}: {e}")
+            continue
+
     
-def download_session_reports(firstYear,lastYear):
+def download_session_reports(firstYear=None, lastYear=None, race_url=None):
     
     firefox_binary_paths = [
         "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
@@ -38,12 +127,30 @@ def download_session_reports(firstYear,lastYear):
     
         driver = webdriver.Firefox(service=Service(os.path.abspath("./geckodriver.exe")), options=options)
 
+    wait = WebDriverWait(driver, 10)
+
+    if race_url:
+        driver.get(race_url)
+        wait_for_overlay_to_clear(driver)
+        try:
+            race_name = wait.until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "p.tabs-details-header"))
+            ).text.strip()
+        except TimeoutException:
+            race_name = "single_race"
+
+        print(f"\n{race_name}")
+        process_current_race(driver, wait, race_name)
+        driver.quit()
+        return
+
+    if firstYear is None or lastYear is None:
+        raise ValueError("firstYear and lastYear are required when race_url is not provided")
+
     
     for YEAR in range(firstYear, lastYear+1):
         driver.get("https://www.indycar.com/Results")
         wait_for_overlay_to_clear(driver)
-
-        wait = WebDriverWait(driver, 10)
     
         button = wait.until(EC.element_to_be_clickable((By.ID, "season-select-button-race")))
         driver.execute_script("arguments[0].click();", button)
@@ -86,54 +193,8 @@ def download_session_reports(firstYear,lastYear):
                 else:
                     xpath = f"//div[contains(@class, 'custom-select-menu') and contains(@class, 'show')]//a[contains(text(), '{race_name}')]"
                 
-                race_option = wait.until(EC.element_to_be_clickable((By.XPATH, xpath)))
-                race_option.click()           
-        
-                time.sleep(2)
-        
-                session_tabs = driver.find_elements(By.CSS_SELECTOR, "div.race-tabs button.tab")
-                
-                session_names = [tab.text.strip() for tab in session_tabs]
-                
-                for i, session_name in enumerate(session_names):
-                    print(f"  Session: {session_name}")
-                    session_tabs[i].click()
-                    time.sleep(2)
-                    
-                    date_elem = driver.find_element(By.CSS_SELECTOR, "p.tabs-details-descriptor")
-                    session_date_text = date_elem.text.strip()
-                    session_date = datetime.strptime(session_date_text, "%A, %B %d, %Y").strftime("%Y%m%d")
-                    
-                    reports_section = driver.find_element(By.ID, "reports-content")
-                    pdf_links = reports_section.find_elements(By.CSS_SELECTOR, "a[href$='.pdf']")
-                    
-                    for link in pdf_links:
-                        pdf_url = link.get_attribute("href")
-                        report_name = link.get_attribute("id").replace('-btn','').replace('-','')
-                        if not pdf_url:
-                            continue
-                        
-                        url_parts = pdf_url.split('/')
-                        race_id = url_parts[-3]
-                        
-                        safe_race_name = race_name.replace("'", "").replace(" ", "_")
-                        safe_session_name = session_name.replace("'", "").replace(" ", "_")
-                        filename = f"{session_date}_{race_id}_{safe_race_name}_{safe_session_name}_{report_name}.pdf"
-                        filepath = os.path.join("./pdfs", report_name, filename)
-                        
-                        if os.path.exists(filepath):
-                            print(f"    Skipping {report_name} (already exists)")
-                            continue
-                        
-                        print(f"    Downloading {report_name}")
-                        os.makedirs(os.path.dirname(filepath), exist_ok=True)
-                        r = requests.get(pdf_url)
-                        if r.status_code == 404:
-                            print(f"    404 error for {report_name}, skipping")
-                            continue
-                        r.raise_for_status()
-                        with open(filepath, "wb") as f:
-                            f.write(r.content)
+                click_with_retry(driver, (By.XPATH, xpath))
+                process_current_race(driver, wait, race_name)
             except Exception as e:
                 print(f"  Error processing race: {e}")
             finally:
@@ -144,5 +205,5 @@ def download_session_reports(firstYear,lastYear):
                
     driver.quit()
 
-if __name__ == "__main__":
-    download_session_reports(2012, 2026)
+if __name__ == " _  _main__":
+    download_session_reports(firstYear=2026, lastYear=2026)
