@@ -215,6 +215,8 @@ def parse_results_pdf(file):
             col = 'Rank'
         elif (t.df.iloc[:-1] == 'P').max().max():
             col = 'P'
+        elif (t.df.iloc[:-1] == 'Pos  SP').max().max():
+            col = 'Pos  SP'
         else:
             continue
         df = t.df
@@ -223,6 +225,12 @@ def parse_results_pdf(file):
     # identify header and first column based on 'Pos' (always first col header)
     hdr = (df == col).any(axis=1).idxmax()
     firstcol = (df == col).any(axis=0).idxmax()
+    
+    if col == 'Pos  SP':
+        df.iloc[hdr,firstcol] = 'SP'
+        df.iloc[hdr,firstcol-1] = 'Pos'
+        col = 'Pos'
+        firstcol = firstcol-1
     
     # verify that the first row is Pos 1
     if df.iloc[hdr+1,firstcol] != '1':
@@ -264,7 +272,7 @@ def clean_results_df(df):
     df.dropna(axis=1, how='all', inplace=True)
     
     # standardize column names
-    df.columns = [x.replace('Driver Name','Driver').replace('\n',' ')
+    df.columns = [x.replace('Driver Name','Driver').replace('\n',' ').replace('  ',' ')
                   for x in df.columns]
     df.columns = df.columns.str.replace('^P$','Pos',regex=True) 
     

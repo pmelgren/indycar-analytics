@@ -23,9 +23,10 @@ def parse_and_clean_results(files):
 
     for file in files:
         # skip exhibition race and some unusable PDFs
+        indy_500_bad = '20130524;2705;Indianapolis_500;PRACTICE_10;results.pdf'
+        kohler_bad = '3528;KOHLER_Grand_Prix;PRACTICE_FINAL'
         if (('$1 Million Challenge.pdf' in file) or 
-            ('20130524_2705_Indianapolis_500_PRACTICE_10_results.pdf' in file)
-            or ('3528_KOHLER_Grand_Prix_PRACTICE_FINAL' in file)):
+            (indy_500_bad in file) or (kohler_bad in file)):
             continue
         
         if file.split('.')[-1] != 'pdf':
@@ -51,5 +52,5 @@ def parse_and_clean_results(files):
         blob.upload_from_string(data=dfclean.to_parquet(index=False),content_type="application/octet-stream")
         print(f"Uploaded gs://motorstats-clean-pq/{gcs_object_path}")
 
-if __name__ == '__main__':
+if __name__ == '_ _main__':
     parse_and_clean_results('all')

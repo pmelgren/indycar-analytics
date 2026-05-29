@@ -19,6 +19,18 @@ from selenium.common.exceptions import (
 options = Options()
 options.headless = False
 
+
+def save_results_table_html(driver, session_date, race_name, session_name):
+    table_html = driver.find_element(By.ID, "race-results-table").get_attribute("outerHTML")
+    safe_race_name = race_name.replace("'", "").replace(" ", "_").replace(";", "_")
+    safe_session_name = session_name.replace("'", "").replace(" ", "_").replace(";", "_")
+    filename = f"{session_date};{safe_race_name};{safe_session_name};results.html"
+    filepath = os.path.join("./html", "results", filename)
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(table_html)
+    print("    Saved html results table")
+
 def wait_for_overlay_to_clear(driver, timeout=10):
     WebDriverWait(driver, timeout).until(
         EC.invisibility_of_element_located((By.CLASS_NAME, "loading-overlay"))
@@ -58,6 +70,10 @@ def process_current_race(driver, wait, race_name):
     for i, session_name in enumerate(session_names):
         try:
             print(f"  Session: {session_name}")
+            if 'race' not in session_name.lower() and race_name.lower() not in session_name.lower() and session_name.lower() not in race_name.lower():
+                continue
+            else:
+                session_name = 'RACE'
             session_tab_locator = (By.CSS_SELECTOR, f"div.race-tabs button.tab:nth-of-type({i + 1})")
             session_tab = wait.until(EC.presence_of_element_located(session_tab_locator))
             if "active" not in session_tab.get_attribute("class"):
@@ -69,6 +85,7 @@ def process_current_race(driver, wait, race_name):
             date_elem = driver.find_element(By.CSS_SELECTOR, "p.tabs-details-descriptor")
             session_date_text = date_elem.text.strip()
             session_date = datetime.strptime(session_date_text, "%A, %B %d, %Y").strftime("%Y%m%d")
+            save_results_table_html(driver, session_date, race_name, session_name)
 
             reports_section = driver.find_element(By.ID, "reports-content")
             pdf_links = reports_section.find_elements(By.CSS_SELECTOR, "a[href$='.pdf']")
@@ -83,9 +100,10 @@ def process_current_race(driver, wait, race_name):
                     url_parts = pdf_url.split('/')
                     race_id = url_parts[-3]
 
-                    safe_race_name = race_name.replace("'", "").replace(" ", "_")
-                    safe_session_name = session_name.replace("'", "").replace(" ", "_")
-                    filename = f"{session_date}_{race_id}_{safe_race_name}_{safe_session_name}_{report_name}.pdf"
+                    safe_race_name = race_name.replace("'", "").replace(" ", "_").replace(";", "_")
+                    safe_session_name = session_name.replace("'", "").replace(" ", "_").replace(";", "_")
+                    safe_report_name = report_name.replace(";", "_")
+                    filename = f"{session_date};{race_id};{safe_race_name};{safe_session_name};{safe_report_name}.pdf"
                     filepath = os.path.join("./pdfs", report_name, filename)
 
                     if os.path.exists(filepath):

@@ -184,3 +184,6 @@ cython_debug/
 /cleandata*
 *.pickle
 /parsedraw
+/apicache
+/html
+/otherdata
