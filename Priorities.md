@@ -16,15 +16,27 @@
 * Complete Historical data through IRL inception
     - Contact IndyCar?
     - Use ChampCarStats.com?
+* Player Pages
+* Team Pages
+    - Clean and incorporate Entries data 
 * Add historical Indy 500's 
 * Add Qualifying and Practice Results
 * Add Sections Times
 * Stats Development
     - Pace Metrics
     - Overtake Classifications
+* 
 
 ### Projections Page
 * Add Projections Page
+    - Automated script to run projections locally
+    - DBT data model and Infra
+        - Data Source
+        - Cleaning models
+        - Model to combine with actual history
+    - Simulation/Projections Page
+        - Full Sesaon View
+        - Rest of Season View
 * Refine Projections methodology
 
 ### Additional Posts
