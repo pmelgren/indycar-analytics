@@ -36,7 +36,7 @@ def parse_and_clean_results(files):
         # read and clean the main results table from each file than save as pq
         parquetfile = file.replace('.pdf', '.pq')
         session_prefix = 'Qualifying' if 'QUALI' in file else 'Race' if 'RACE' in file else 'Practice'
-        gcs_object_path = f"results/{session_prefix}/{parquetfile}"
+        gcs_object_path = f"results/PDF/{session_prefix}/{parquetfile}"
 
         if bucket.blob(gcs_object_path).exists():
             print(f"Skipping existing GCS object: gs://motorstats-clean-pq/{gcs_object_path}")

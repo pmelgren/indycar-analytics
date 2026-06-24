@@ -3,6 +3,7 @@ import time
 import requests
 from pathlib import Path
 from datetime import datetime
+from urllib.parse import urlparse
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -20,12 +21,16 @@ options = Options()
 options.headless = False
 
 
-def save_results_table_html(driver, session_date, race_name, session_name):
+def save_results_table_html(driver, session_date, race_name, session_name, series_tag=""):
     table_html = driver.find_element(By.ID, "race-results-table").get_attribute("outerHTML")
     safe_race_name = race_name.replace("'", "").replace(" ", "_").replace(";", "_")
     safe_session_name = session_name.replace("'", "").replace(" ", "_").replace(";", "_")
-    filename = f"{session_date};{safe_race_name};{safe_session_name};results.html"
-    filepath = os.path.join("./html", "results", filename)
+    if series_tag:
+        filename = f"{session_date};{safe_race_name};{safe_session_name};results;{series_tag}.html"
+        filepath = os.path.join("./html", "results", filename)
+    else:
+        filename = f"{session_date};{safe_race_name};{safe_session_name};results.html"
+        filepath = os.path.join("./html", "results", filename)
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     with open(filepath, "w", encoding="utf-8") as f:
         f.write(table_html)
@@ -59,7 +64,7 @@ def click_with_retry(driver, locator, timeout=10, attempts=3):
         raise last_error
 
 
-def process_current_race(driver, wait, race_name):
+def process_current_race(driver, wait, race_name, series_tag=""):
     wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.race-tabs button.tab")))
     wait_for_overlay_to_clear(driver)
     time.sleep(2)
@@ -70,10 +75,10 @@ def process_current_race(driver, wait, race_name):
     for i, session_name in enumerate(session_names):
         try:
             print(f"  Session: {session_name}")
-            if 'race' not in session_name.lower() and race_name.lower() not in session_name.lower() and session_name.lower() not in race_name.lower():
-                continue
-            else:
+            # some years the race session is referred to by the event name, not by "Race"
+            if (race_name.lower() in session_name.lower()) or (session_name.lower() in race_name.lower()):
                 session_name = 'RACE'
+                
             session_tab_locator = (By.CSS_SELECTOR, f"div.race-tabs button.tab:nth-of-type({i + 1})")
             session_tab = wait.until(EC.presence_of_element_located(session_tab_locator))
             if "active" not in session_tab.get_attribute("class"):
@@ -85,7 +90,7 @@ def process_current_race(driver, wait, race_name):
             date_elem = driver.find_element(By.CSS_SELECTOR, "p.tabs-details-descriptor")
             session_date_text = date_elem.text.strip()
             session_date = datetime.strptime(session_date_text, "%A, %B %d, %Y").strftime("%Y%m%d")
-            save_results_table_html(driver, session_date, race_name, session_name)
+            save_results_table_html(driver, session_date, race_name, session_name, series_tag)
 
             reports_section = driver.find_element(By.ID, "reports-content")
             pdf_links = reports_section.find_elements(By.CSS_SELECTOR, "a[href$='.pdf']")
@@ -103,8 +108,12 @@ def process_current_race(driver, wait, race_name):
                     safe_race_name = race_name.replace("'", "").replace(" ", "_").replace(";", "_")
                     safe_session_name = session_name.replace("'", "").replace(" ", "_").replace(";", "_")
                     safe_report_name = report_name.replace(";", "_")
-                    filename = f"{session_date};{race_id};{safe_race_name};{safe_session_name};{safe_report_name}.pdf"
-                    filepath = os.path.join("./pdfs", report_name, filename)
+                    if series_tag:
+                        filename = f"{session_date};{race_id};{safe_race_name};{safe_session_name};{safe_report_name};{series_tag}.pdf"
+                        filepath = os.path.join("./pdfs", report_name, filename)
+                    else:
+                        filename = f"{session_date};{race_id};{safe_race_name};{safe_session_name};{safe_report_name}.pdf"
+                        filepath = os.path.join("./pdfs", report_name, filename)
 
                     if os.path.exists(filepath):
                         print(f"    Skipping {report_name} (already exists)")
@@ -127,7 +136,7 @@ def process_current_race(driver, wait, race_name):
             continue
 
     
-def download_session_reports(firstYear=None, lastYear=None, race_url=None):
+def download_session_reports(firstYear=None, lastYear=None, race_url=None, site_domain="indycar.com"):
     
     firefox_binary_paths = [
         "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
@@ -148,6 +157,16 @@ def download_session_reports(firstYear=None, lastYear=None, race_url=None):
     wait = WebDriverWait(driver, 10)
 
     if race_url:
+        race_url_domain = urlparse(race_url).netloc.lower()
+        if "indynxt.com" in race_url_domain:
+            site_domain = "indynxt.com"
+        elif "indycar.com" in race_url_domain:
+            site_domain = "indycar.com"
+
+    series_tag = "indynxt" if "indynxt" in site_domain.lower() else ""
+    results_url = f"https://www.{site_domain}/results"
+
+    if race_url:
         driver.get(race_url)
         wait_for_overlay_to_clear(driver)
         try:
@@ -158,7 +177,7 @@ def download_session_reports(firstYear=None, lastYear=None, race_url=None):
             race_name = "single_race"
 
         print(f"\n{race_name}")
-        process_current_race(driver, wait, race_name)
+        process_current_race(driver, wait, race_name, series_tag)
         driver.quit()
         return
 
@@ -167,7 +186,7 @@ def download_session_reports(firstYear=None, lastYear=None, race_url=None):
 
     
     for YEAR in range(firstYear, lastYear+1):
-        driver.get("https://www.indycar.com/Results")
+        driver.get(results_url)
         wait_for_overlay_to_clear(driver)
     
         button = wait.until(EC.element_to_be_clickable((By.ID, "season-select-button-race")))
@@ -202,26 +221,58 @@ def download_session_reports(firstYear=None, lastYear=None, race_url=None):
         race_names = []
         for r in race_options:
             race_names.append(r.text.strip())
+
+        print(race_names)
+
+        button = wait.until(EC.element_to_be_clickable((By.ID, "race-select-button")))
+        driver.execute_script("arguments[0].scrollIntoView(true);", button)
+        time.sleep(0.5)
+        driver.execute_script("arguments[0].click();", button)
+        wait_for_overlay_to_clear(driver)
         
         for race_name in race_names:
             print(f"\n{race_name}")
-            try:
-                if "'" in race_name:
-                    xpath = f'//div[contains(@class, "custom-select-menu") and contains(@class, "show")]//a[contains(text(), "{race_name}")]'
-                else:
-                    xpath = f"//div[contains(@class, 'custom-select-menu') and contains(@class, 'show')]//a[contains(text(), '{race_name}')]"
-                
-                click_with_retry(driver, (By.XPATH, xpath))
-                process_current_race(driver, wait, race_name)
-            except Exception as e:
-                print(f"  Error processing race: {e}")
-            finally:
-                button = wait.until(EC.element_to_be_clickable((By.ID, "race-select-button")))
-                driver.execute_script("arguments[0].scrollIntoView(true);", button)
-                time.sleep(0.5)
-                driver.execute_script("arguments[0].click();", button)
+            race_processed = False
+            for attempt in range(2):
+                try:
+                    button = wait.until(EC.element_to_be_clickable((By.ID, "race-select-button")))
+                    driver.execute_script("arguments[0].scrollIntoView(true);", button)
+                    time.sleep(0.5)
+                    driver.execute_script("arguments[0].click();", button)
+                    wait_for_overlay_to_clear(driver)
+
+                    if "'" in race_name:
+                        xpath = f'//div[contains(@class, "custom-select-menu") and contains(@class, "show")]//a[contains(text(), "{race_name}")]'
+                    else:
+                        xpath = f"//div[contains(@class, 'custom-select-menu') and contains(@class, 'show')]//a[contains(text(), '{race_name}')]"
+
+                    click_with_retry(driver, (By.XPATH, xpath))
+                    process_current_race(driver, wait, race_name, series_tag)
+                    race_processed = True
+                    break
+                except Exception as e:
+                    if attempt == 0:
+                        driver.get(results_url)
+                        wait_for_overlay_to_clear(driver)
+
+                        button = wait.until(EC.element_to_be_clickable((By.ID, "season-select-button-race")))
+                        driver.execute_script("arguments[0].click();", button)
+                        year_option = wait.until(EC.element_to_be_clickable(
+                            (By.XPATH, f"//div[@class='custom-select-menu show']//a[text()='{YEAR}']")))
+                        driver.execute_script("arguments[0].scrollIntoView(true);", year_option)
+                        time.sleep(0.5)
+                        wait_for_overlay_to_clear(driver)
+                        try:
+                            year_option.click()
+                            wait_for_overlay_to_clear(driver)
+                        except Exception:
+                            driver.execute_script("arguments[0].click();", year_option)
+                    else:
+                        print(f"  Error processing race: {e}")
+            if not race_processed:
+                continue
                
     driver.quit()
 
-if __name__ == " _  _main__":
+if __name__ == "_ _main__":
     download_session_reports(firstYear=2026, lastYear=2026)

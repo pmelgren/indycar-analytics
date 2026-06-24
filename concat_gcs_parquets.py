@@ -14,8 +14,15 @@ client = storage.Client(credentials=credentials, project=credentials.project_id)
 bucket = client.bucket("motorstats-clean-pq")
 
 # List all blobs in the results/ directory
-for stype in ['Race']:# ,'Practice','Qualifying','HTML',
-    blobs = bucket.list_blobs(prefix=f"results/{stype}/")
+for source_type, session_type in [
+    # ("PDF", "Race"),
+    # ("PDF", "Qualifying"),
+    # ("PDF", "Practice"),
+    ("HTML", "Race"),
+    ("HTML", "Qualifying"),
+    ("HTML", "Practice"),
+]:
+    blobs = bucket.list_blobs(prefix=f"results/{source_type}/{session_type}/")
     
     dfs = []
     for blob in blobs:
@@ -24,7 +31,11 @@ for stype in ['Race']:# ,'Practice','Qualifying','HTML',
             df = pd.read_parquet(BytesIO(content))
             dfs.append(df)
         else:
-            print(f"Unknown session type for file: {blob.name}")
+            print(f"Skipping non-parquet file: {blob.name}")
+
+    if not dfs:
+        print(f"No parquet files found under results/{source_type}/{session_type}/")
+        continue
 
     dfall = pd.concat(dfs).reset_index(drop=True)
     object_cols = dfall.select_dtypes(include=["object"]).columns
@@ -34,8 +45,8 @@ for stype in ['Race']:# ,'Practice','Qualifying','HTML',
     # make col names safe for bigquery
     dfall.columns = [c.replace('.','_') for c in dfall.columns]
     
-    print(f'{stype} columns: {dfall.columns}')
-    gcs_path = f"results/combined_{stype}.pq"
+    print(f'{source_type}/{session_type} columns: {dfall.columns}')
+    gcs_path = f"results/combined_{source_type}_{session_type}.pq"
     blob = bucket.blob(gcs_path)
     blob.upload_from_string(data=dfall.to_parquet(index=False), content_type="application/octet-stream")
 

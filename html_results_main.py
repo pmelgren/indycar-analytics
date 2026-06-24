@@ -28,7 +28,8 @@ def parse_and_clean_html_results(files):
             continue
 
         parquetfile = file.replace('.html', '.pq')
-        gcs_object_path = f"results/HTML/{parquetfile}"
+        session_prefix = 'Qualifying' if 'QUAL' in file.upper() else 'Race' if 'RACE' in file.upper() else 'Practice'
+        gcs_object_path = f"results/HTML/{session_prefix}/{parquetfile}"
 
         if bucket.blob(gcs_object_path).exists():
             print(f"Skipping existing GCS object: gs://motorstats-clean-pq/{gcs_object_path}")
@@ -45,5 +46,5 @@ def parse_and_clean_html_results(files):
         print(f"Uploaded gs://motorstats-clean-pq/{gcs_object_path}")
 
 
-if __name__ == '_ _main__':
+if __name__ == '__main__':
     parse_and_clean_html_results('all')
