@@ -301,6 +301,8 @@ def clean_results_df(df):
     # standardize CAET column
     if 'C/E/T' in df.columns:
         df.rename(columns = {'C/E/T':'C/A/E/T'}, inplace=True)
+    elif 'C/A/E/T' not in df.columns:
+        df['C/A/E/T'] = ''
         
     if 'kit/Engine' in df.columns:
         df['C/A/E/T'] = df['kit/Engine'].apply(lambda x: 'D/'+x[0]+'/'+x[0]+'/F')

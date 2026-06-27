@@ -15,9 +15,9 @@ bucket = client.bucket("motorstats-clean-pq")
 
 # List all blobs in the results/ directory
 for source_type, session_type in [
-    # ("PDF", "Race"),
-    # ("PDF", "Qualifying"),
-    # ("PDF", "Practice"),
+    ("PDF", "Race"),
+    ("PDF", "Qualifying"),
+    ("PDF", "Practice"),
     ("HTML", "Race"),
     ("HTML", "Qualifying"),
     ("HTML", "Practice"),

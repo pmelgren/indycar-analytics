@@ -12,6 +12,16 @@ credentials = service_account.Credentials.from_service_account_file(credentials_
 client = storage.Client(credentials=credentials, project=credentials.project_id)
 bucket = client.bucket("motorstats-clean-pq")
 
+
+def get_session_prefix(file_name):
+    tokens = [p.upper() for p in file_name.replace('.pdf', '').split(';') if p]
+    session_token = tokens[3] if len(tokens) > 3 else (tokens[2] if len(tokens) > 2 else '')
+    if 'QUAL' in session_token or 'FAST_12' in session_token or 'FAST_6' in session_token:
+        return 'Qualifying'
+    if 'PRACTICE' in session_token or 'WARMUP' in session_token:
+        return 'Practice'
+    return 'Race'
+
 def parse_and_clean_results(files):
 
     # if files is 'All', get the list of all files
@@ -35,7 +45,7 @@ def parse_and_clean_results(files):
             
         # read and clean the main results table from each file than save as pq
         parquetfile = file.replace('.pdf', '.pq')
-        session_prefix = 'Qualifying' if 'QUALI' in file else 'Race' if 'RACE' in file else 'Practice'
+        session_prefix = get_session_prefix(file)
         gcs_object_path = f"results/PDF/{session_prefix}/{parquetfile}"
 
         if bucket.blob(gcs_object_path).exists():
