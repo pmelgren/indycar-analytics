@@ -274,5 +274,5 @@ def download_session_reports(firstYear=None, lastYear=None, race_url=None, site_
                
     driver.quit()
 
-if __name__ == "_ _main__":
+if __name__ == '__main__':
     download_session_reports(firstYear=2026, lastYear=2026)

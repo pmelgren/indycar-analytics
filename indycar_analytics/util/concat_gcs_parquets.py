@@ -7,7 +7,7 @@ from io import BytesIO
 # Set up GCS
 credentials_path = os.getenv(
     "GOOGLE_APPLICATION_CREDENTIALS",
-    os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "dbt-service-account-credentials.json"))
+    os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "dbt-service-account-credentials.json"))
 )
 credentials = service_account.Credentials.from_service_account_file(credentials_path)
 client = storage.Client(credentials=credentials, project=credentials.project_id)

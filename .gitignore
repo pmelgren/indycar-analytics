@@ -189,3 +189,4 @@ cython_debug/
 /otherdata
 /*.csv
 throttle.ctrl
+/data/html

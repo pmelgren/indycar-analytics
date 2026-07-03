@@ -3,6 +3,16 @@ Data parsing and analytics for working with indycar data.
 
 This repo contians functions that help parse data from INDYCAR's session report pdfs into a usable format for analysis. The repo also contains notebooks with in-depth analysis on certain topics.
 
+## Repository Layout
+- `indycar_analytics/results/` - results PDF parser and results cleaning scripts.
+- `indycar_analytics/html_results/` - HTML results parser scripts.
+- `indycar_analytics/section_results/` - section results parser/cleaning scripts.
+- `indycar_analytics/lap_charts/` - lap chart parsing scripts.
+- `indycar_analytics/scraper/` - session report downloader scripts.
+- `indycar_analytics/schedules/` - Wikimedia schedules/entries extraction scripts.
+- `indycar_analytics/util/` - universal shared helpers and concat scripts.
+- `notebooks/` - analysis notebooks.
+
 PLEASE NOTE: This repo is a work in progress and is intended fo enterntainment/research purposes only. If you use these functions, please credit the original source and feel free to contribute any functions/insights you come up with. 
 
 ## Basic Usage
@@ -10,7 +20,7 @@ Begin by downloading INDYCAR session reports here: https://indycar.com/results a
 
 To parse the data of a section times pdf you can run the following:
 ```
-from parsing._section_results_main import parse_and_clean_section_results
+from indycar_analytics.section_results.main import parse_and_clean_section_results
 parse_and_clean_section_results(['2017_Toyota_Grand_Prix_of_Long_Beach.pdf'])`
 ```
 

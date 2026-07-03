@@ -3,7 +3,7 @@ import pandas as pd
 import re
 import os
 import json
-from _util import get_page_fills
+from indycar_analytics.util.pdf_utils import get_page_fills
 
 def find_fill(span, filled_rects):
     span_rect = fitz.Rect(span["bbox"])
@@ -73,6 +73,10 @@ def parse_lap_chart_file(doc):
                 else:
                     laps.append({'Lap':s.get('text').strip(),
                                 'Fill':find_fill(s, fills)})
+
+    if dfs:
+        return pd.concat(dfs).reset_index(drop=True)
+    return pd.DataFrame()
     
                     
 if __name__ == '__main__':
