@@ -27,10 +27,10 @@ def save_results_table_html(driver, session_date, race_name, session_name, serie
     safe_session_name = session_name.replace("'", "").replace(" ", "_").replace(";", "_")
     if series_tag:
         filename = f"{session_date};{safe_race_name};{safe_session_name};results;{series_tag}.html"
-        filepath = os.path.join("./html", "results", filename)
+        filepath = os.path.join("./data", "html", "results", filename)
     else:
         filename = f"{session_date};{safe_race_name};{safe_session_name};results.html"
-        filepath = os.path.join("./html", "results", filename)
+        filepath = os.path.join("./data", "html", "results", filename)
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     with open(filepath, "w", encoding="utf-8") as f:
         f.write(table_html)
@@ -110,10 +110,10 @@ def process_current_race(driver, wait, race_name, series_tag=""):
                     safe_report_name = report_name.replace(";", "_")
                     if series_tag:
                         filename = f"{session_date};{race_id};{safe_race_name};{safe_session_name};{safe_report_name};{series_tag}.pdf"
-                        filepath = os.path.join("./pdfs", report_name, filename)
+                        filepath = os.path.join("./data", "pdfs", report_name, filename)
                     else:
                         filename = f"{session_date};{race_id};{safe_race_name};{safe_session_name};{safe_report_name}.pdf"
-                        filepath = os.path.join("./pdfs", report_name, filename)
+                        filepath = os.path.join("./data", "pdfs", report_name, filename)
 
                     if os.path.exists(filepath):
                         print(f"    Skipping {report_name} (already exists)")
@@ -273,6 +273,3 @@ def download_session_reports(firstYear=None, lastYear=None, race_url=None, site_
                 continue
                
     driver.quit()
-
-if __name__ == '__main__':
-    download_session_reports(firstYear=2026, lastYear=2026)

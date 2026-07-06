@@ -37,6 +37,7 @@ logger.addHandler(file_handler)
 logger.addHandler(stream_handler)
    
 def parse_and_clean_section_results(files):
+    failed_files = []
 
     # if files is 'All', get the list of all files
     if type(files) == str:
@@ -79,4 +80,10 @@ def parse_and_clean_section_results(files):
             logger.debug(f'PDF->Parquet time: {time.perf_counter() - start:.2f}s')
             logger.info(f'SUCCESS: {file}')
         except Exception as e:
+            failed_files.append(file)
             logger.warning(f'FAILED PDF->Parquet: {file} | {e}')
+
+    if failed_files:
+        logger.info('Failed files:')
+        for f in failed_files:
+            logger.info(f'- {f}')

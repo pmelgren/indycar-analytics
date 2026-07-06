@@ -1,4 +1,5 @@
 import os
+from io import StringIO
 import pandas as pd
 from google.cloud import storage
 from google.oauth2 import service_account
@@ -24,6 +25,7 @@ def get_session_prefix(file_name):
 
 
 def parse_and_clean_html_results(files):
+    failed_files = []
 
     # if files is 'All', get the list of all files
     if type(files) == str:
@@ -33,27 +35,36 @@ def parse_and_clean_html_results(files):
             files = [files]
 
     for file in files:
-        if file.split('.')[-1] != 'html':
-            print(f'Skipping file {file}')
-            continue
+        try:
+            if file.split('.')[-1] != 'html':
+                print(f'Skipping file {file}')
+                continue
 
-        parquetfile = file.replace('.html', '.pq')
-        session_prefix = get_session_prefix(file)
-        gcs_object_path = f"results/HTML/{session_prefix}/{parquetfile}"
+            parquetfile = file.replace('.html', '.pq')
+            session_prefix = get_session_prefix(file)
+            gcs_object_path = f"results/HTML/{session_prefix}/{parquetfile}"
 
-        if bucket.blob(gcs_object_path).exists():
-            print(f"Skipping existing GCS object: gs://motorstats-clean-pq/{gcs_object_path}")
-            continue
+            if bucket.blob(gcs_object_path).exists():
+                print(f"Skipping existing GCS object: gs://motorstats-clean-pq/{gcs_object_path}")
+                continue
 
-        with open(os.path.join('html', 'results', file), 'r', encoding='utf-8') as f:
-            table_html = f.read()
+            with open(os.path.join('html', 'results', file), 'r', encoding='utf-8') as f:
+                table_html = f.read()
 
-        df = pd.read_html(table_html, converters={'No.': str})[0]
-        df['file'] = file
+            df = pd.read_html(StringIO(table_html), converters={'No.': str})[0]
+            df['file'] = file
 
-        blob = bucket.blob(gcs_object_path)
-        blob.upload_from_string(data=df.to_parquet(index=False), content_type="application/octet-stream")
-        print(f"Uploaded gs://motorstats-clean-pq/{gcs_object_path}")
+            blob = bucket.blob(gcs_object_path)
+            blob.upload_from_string(data=df.to_parquet(index=False), content_type="application/octet-stream")
+            print(f"Uploaded gs://motorstats-clean-pq/{gcs_object_path}")
+        except Exception as e:
+            failed_files.append(file)
+            print(f"FAILED {file}: {e}")
+
+    if failed_files:
+        print("\nFailed files:")
+        for f in failed_files:
+            print(f"- {f}")
 
 
 if __name__ == '__main__':

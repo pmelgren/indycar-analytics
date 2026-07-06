@@ -15,34 +15,45 @@ bucket = client.bucket("motorstats-clean-pq")
 
 
 def parse_and_clean_lap_charts(files):
+    failed_files = []
+    lapchart_dir = os.path.join('data', 'pdfs', 'lapchart')
 
     if type(files) == str:
         if files.lower() == 'all':
-            files = os.listdir("pdfs/lap charts/")
+            files = os.listdir(lapchart_dir)
         else:
             files = [files]
 
     for file in files:
-        if file.split('.')[-1] != 'pdf':
-            print(f'Skipping file {file}')
-            continue
+        try:
+            if file.split('.')[-1] != 'pdf':
+                print(f'Skipping file {file}')
+                continue
 
-        parquetfile = file.replace('.pdf', '.pq')
-        gcs_object_path = f"lapcharts/{parquetfile}"
+            parquetfile = file.replace('.pdf', '.pq')
+            gcs_object_path = f"lapcharts/Race/{parquetfile}"
 
-        if bucket.blob(gcs_object_path).exists():
-            print(f"Skipping existing GCS object: gs://motorstats-clean-pq/{gcs_object_path}")
-            continue
+            if bucket.blob(gcs_object_path).exists():
+                print(f"Skipping existing GCS object: gs://motorstats-clean-pq/{gcs_object_path}")
+                continue
 
-        doc = fitz.open(os.path.join('pdfs', 'lap charts', file))
-        df = parse_lap_chart_file(doc)
+            doc = fitz.open(os.path.join(lapchart_dir, file))
+            df = parse_lap_chart_file(doc)
 
-        if df.empty:
-            print(f"No lap chart rows parsed for {file}")
-            continue
+            if df.empty:
+                print(f"No lap chart rows parsed for {file}")
+                continue
 
-        df['file'] = file
+            df['file'] = file
 
-        blob = bucket.blob(gcs_object_path)
-        blob.upload_from_string(data=df.to_parquet(index=False), content_type="application/octet-stream")
-        print(f"Uploaded gs://motorstats-clean-pq/{gcs_object_path}")
+            blob = bucket.blob(gcs_object_path)
+            blob.upload_from_string(data=df.to_parquet(index=False), content_type="application/octet-stream")
+            print(f"Uploaded gs://motorstats-clean-pq/{gcs_object_path}")
+        except Exception as e:
+            failed_files.append(file)
+            print(f"FAILED {file}: {e}")
+
+    if failed_files:
+        print("\nFailed files:")
+        for f in failed_files:
+            print(f"- {f}")
