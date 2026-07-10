@@ -64,6 +64,24 @@ def click_with_retry(driver, locator, timeout=10, attempts=3):
         raise last_error
 
 
+def recover_from_object_moved_page(driver):
+    body_text = driver.find_element(By.TAG_NAME, "body").text
+    if "Object moved to" not in body_text:
+        return False
+
+    redirect_links = driver.find_elements(By.XPATH, "//a[normalize-space(text())='here']")
+    for link in redirect_links:
+        href = link.get_attribute("href")
+        if href and "/results/" in href.lower():
+            print("  Redirect page detected, following results link")
+            driver.get(href)
+            wait_for_overlay_to_clear(driver)
+            time.sleep(2)
+            return True
+
+    return False
+
+
 def process_current_race(driver, wait, race_name, series_tag=""):
     wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.race-tabs button.tab")))
     wait_for_overlay_to_clear(driver)
@@ -208,6 +226,9 @@ def download_session_reports(firstYear=None, lastYear=None, race_url=None, site_
     
         print(YEAR)
         time.sleep(2)
+
+        if not driver.find_elements(By.ID, "race-select-button"):
+            recover_from_object_moved_page(driver)
         
         button = wait.until(EC.element_to_be_clickable((By.ID, "race-select-button")))
         button.click()
@@ -267,6 +288,9 @@ def download_session_reports(firstYear=None, lastYear=None, race_url=None, site_
                             wait_for_overlay_to_clear(driver)
                         except Exception:
                             driver.execute_script("arguments[0].click();", year_option)
+
+                        if not driver.find_elements(By.ID, "race-select-button"):
+                            recover_from_object_moved_page(driver)
                     else:
                         print(f"  Error processing race: {e}")
             if not race_processed:
