@@ -1,5 +1,6 @@
 import os
 from .cleaning import parse_results_pdf, clean_results_df
+from ..util.session_routing import get_session_prefix
 from google.cloud import storage
 from google.oauth2 import service_account
 
@@ -11,24 +12,13 @@ credentials_path = os.getenv(
 credentials = service_account.Credentials.from_service_account_file(credentials_path)
 client = storage.Client(credentials=credentials, project=credentials.project_id)
 bucket = client.bucket("motorstats-clean-pq")
-
-
-def get_session_prefix(file_name):
-    tokens = [p.upper() for p in file_name.replace('.pdf', '').split(';') if p]
-    session_token = tokens[3] if len(tokens) > 3 else (tokens[2] if len(tokens) > 2 else '')
-    if 'QUAL' in session_token or 'FAST_12' in session_token or 'FAST_6' in session_token:
-        return 'Qualifying'
-    if 'PRACTICE' in session_token or 'WARMUP' in session_token:
-        return 'Practice'
-    return 'Race'
-
 def parse_and_clean_results(files):
     failed_files = []
 
     # if files is 'All', get the list of all files
     if type(files) == str:
         if files.upper() == 'ALL':
-            files = os.listdir("pdfs/results/")
+            files = os.listdir("data/pdfs/results/")
         else:
             files = [files]
 
@@ -47,7 +37,7 @@ def parse_and_clean_results(files):
                 
             # read and clean the main results table from each file than save as pq
             parquetfile = file.replace('.pdf', '.pq')
-            session_prefix = get_session_prefix(file)
+            session_prefix = get_session_prefix(file, session_token_index=3, fallback_session_token_index=2)
             gcs_object_path = f"results/PDF/{session_prefix}/{parquetfile}"
 
             if bucket.blob(gcs_object_path).exists():
@@ -55,7 +45,7 @@ def parse_and_clean_results(files):
                 continue
 
             # parse pdf and clean resulting df
-            df = parse_results_pdf(os.path.join('pdfs','results',file))
+            df = parse_results_pdf(os.path.join('data', 'pdfs', 'results', file))
             dfclean = clean_results_df(df)
             dfclean['file'] = file
 
@@ -72,5 +62,5 @@ def parse_and_clean_results(files):
         for f in failed_files:
             print(f"- {f}")
 
-if __name__ == '_ _main__':
+if __name__ == '__main__':
     parse_and_clean_results('all')

@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 # File handler - captures all DEBUG and above
-file_handler = logging.FileHandler(f'./logs/section_parser-{suffix}.log', mode='a')
+file_handler = logging.FileHandler(f'./data/logs/section_parser-{suffix}.log', mode='a')
 file_handler.setLevel(logging.DEBUG)
 file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
 
@@ -42,7 +42,7 @@ def parse_and_clean_section_results(files):
     # if files is 'All', get the list of all files
     if type(files) == str:
         if files.lower() == 'all':
-            files = os.listdir("pdfs/sectionresults/")
+            files = os.listdir("data/pdfs/sectionresults/")
         
     for file in files:
         parquetfile = file.replace('.pdf', '.pq')
@@ -55,7 +55,7 @@ def parse_and_clean_section_results(files):
 
             start = time.perf_counter()
             logger.debug(f'Parsing and cleaning {file}')
-            doc = fitz.open(os.path.join('pdfs', 'sectionresults', file))
+            doc = fitz.open(os.path.join('data', 'pdfs', 'sectionresults', file))
             allrows = parse_file(doc)
             df = pd.DataFrame(allrows)
 

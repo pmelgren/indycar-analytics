@@ -296,7 +296,7 @@ def clean_results_df(df):
     
     # Coalesce the extracted values, prioritizing fix, then fix2, then original
     df['Driver'] = fix['Driver'].fillna(fix2['Driver']).fillna(df['Driver'])
-    df['Car'] = fix['Car'].fillna(fix2['Car']).fillna(df['Car'])
+    df['Car'] = fix['Car'].fillna(fix2['Car']).fillna(df['Car']).infer_objects(copy=False)
     
     # standardize CAET column
     if 'C/E/T' in df.columns:
