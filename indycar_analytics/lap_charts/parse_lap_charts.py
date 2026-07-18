@@ -19,9 +19,15 @@ def find_fill(span, filled_rects):
 
     return None
 
+def _span_text(span):
+    text = span.get('text')
+    if text is not None:
+        return text
+    return ''.join(c.get('c', '') for c in span.get('chars', []))
+
 def _span_tokens(line):
     """Return all whitespace-split tokens from a PDF line's spans."""
-    return [t for s in line.get('spans', []) for t in s.get('text', '').split() if t]
+    return [t for s in line.get('spans', []) for t in _span_text(s).split() if t]
 
 def _is_car_row(block):
     """True if the block contains at least one line of all-digit tokens (car numbers)."""
@@ -35,18 +41,40 @@ def _is_uniform_block(block):
     all_tokens = [t for l in block['lines'] for t in _span_tokens(l)]
     return len(all_tokens) > 0 and len(set(all_tokens)) == 1
 
+def _span_digit_tokens(span):
+    """Return [(digit_token, token_bbox)] from a span using char boxes when available."""
+    text = _span_text(span)
+    chars = span.get('chars', [])
+    tokens = []
+
+    for m in re.finditer(r'\d+', text):
+        token = m.group(0)
+        start, end = m.start(), m.end()
+
+        if chars and end <= len(chars):
+            token_chars = chars[start:end]
+            x0 = min(c['bbox'][0] for c in token_chars)
+            y0 = min(c['bbox'][1] for c in token_chars)
+            x1 = max(c['bbox'][2] for c in token_chars)
+            y1 = max(c['bbox'][3] for c in token_chars)
+            tokens.append((token, (x0, y0, x1, y1)))
+        else:
+            tokens.append((token, span['bbox']))
+
+    return tokens
+
 def parse_lap_chart_file(doc):
     dfs = []
 
     for page in doc:
-        ptext = page.get_text('dict')
+        ptext = page.get_text('rawdict')
         page_fills = get_page_fills(page.get_drawings())
 
         # Step 1: find the block containing 'Drivers in Race:' — this holds the lap numbers.
         lap_block = next(
             (b for b in ptext['blocks']
              if b.get('lines') and any(
-                 'Drivers in Race' in s.get('text', '')
+                 'Drivers in Race' in _span_text(s)
                  for l in b['lines'] for s in l.get('spans', []))),
             None
         )
@@ -59,14 +87,15 @@ def parse_lap_chart_file(doc):
         seen_header = False
         for l in lap_block['lines']:
             for s in l.get('spans', []):
-                text = s.get('text', '').strip()
+                text = _span_text(s).strip()
                 if not text:
                     continue
                 if 'Drivers in Race' in text:
                     seen_header = True
                     continue
-                fill = find_fill(s, page_fills)
-                for token in text.split():
+
+                for token, token_bbox in _span_digit_tokens(s):
+                    fill = find_fill({'bbox': token_bbox}, page_fills)
                     (after if seen_header else before).append((token, fill))
 
         # If laps follow the header use them directly; if they precede it they are
@@ -123,7 +152,7 @@ def parse_lap_chart_file(doc):
             # In 2013 lines run right-to-left (last lap first), so reverse.
             # Detect direction by comparing x of first vs last non-empty line.
             def line_x(l):
-                spans = [s for s in l.get('spans', []) if s.get('text', '').strip()]
+                spans = [s for s in l.get('spans', []) if _span_text(s).strip()]
                 return spans[0]['bbox'][0] if spans else None
 
             first_x = next((line_x(l) for l in b['lines'] if line_x(l) is not None), None)
@@ -136,11 +165,12 @@ def parse_lap_chart_file(doc):
                     continue  # skip position-label lines — not car data
                 tokens = _span_tokens(l)
                 if not tokens or not all(t.isdigit() for t in tokens):
-                    continue  # skip driver-name lines
+                    continue
+
                 for s in l.get('spans', []):
-                    cars = s.get('text', '').split()
-                    lcars += cars
-                    fills += [find_fill(s, page_fills)] * len(cars)
+                    for token, token_bbox in _span_digit_tokens(s):
+                        lcars.append(token)
+                        fills.append(find_fill({'bbox': token_bbox}, page_fills))
 
             row_count = len(lcars)
             if not row_count:

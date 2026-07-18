@@ -21,10 +21,20 @@ options = Options()
 options.headless = False
 
 
+def normalize_race_name_token(race_name):
+    normalized = race_name.replace("'", "").replace(";", "_").replace("_", " ").strip()
+    return "_".join(normalized.title().split())
+
+
+def normalize_session_name_token(session_name):
+    normalized = session_name.replace("'", "").replace(";", "_").replace(" ", "_")
+    return normalized.upper()
+
+
 def save_results_table_html(driver, session_date, race_name, session_name, series_tag=""):
     table_html = driver.find_element(By.ID, "race-results-table").get_attribute("outerHTML")
-    safe_race_name = race_name.replace("'", "").replace(" ", "_").replace(";", "_")
-    safe_session_name = session_name.replace("'", "").replace(" ", "_").replace(";", "_")
+    safe_race_name = normalize_race_name_token(race_name)
+    safe_session_name = normalize_session_name_token(session_name)
     if series_tag:
         filename = f"{session_date};{safe_race_name};{safe_session_name};results;{series_tag}.html"
         filepath = os.path.join("./data", "html", "results", filename)
@@ -123,8 +133,8 @@ def process_current_race(driver, wait, race_name, series_tag=""):
                     url_parts = pdf_url.split('/')
                     race_id = url_parts[-3]
 
-                    safe_race_name = race_name.replace("'", "").replace(" ", "_").replace(";", "_")
-                    safe_session_name = session_name.replace("'", "").replace(" ", "_").replace(";", "_")
+                    safe_race_name = normalize_race_name_token(race_name)
+                    safe_session_name = normalize_session_name_token(session_name)
                     safe_report_name = report_name.replace(";", "_")
                     if series_tag:
                         filename = f"{session_date};{race_id};{safe_race_name};{safe_session_name};{safe_report_name};{series_tag}.pdf"
